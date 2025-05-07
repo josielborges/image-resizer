@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redimensionador de Imagens</title>
+    <style>
+        :root {
+            --primary-color: #4a6ed0;
+            --primary-hover: #3a5bbd;
+            --secondary-color: #f8f9fa;
+            --border-color: #e0e0e0;
+            --text-color: #333;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --radius: 8px;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fb;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        
+        .app-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        .app-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        @media (min-width: 768px) {
+            .app-grid.horizontal {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+        }
+        
+        @media (min-width: 768px) {
+            .app-grid {
+                grid-template-columns: 280px 1fr;
+            }
+        }
+        
+        .controls-panel {
+            background-color: var(--secondary-color);
+            padding: 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+        }
+        
+        .preview-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .unit-selector {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+        
+        .unit-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        input[type="number"], 
+        input[type="file"], 
+        input[type="text"], 
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="number"]:focus, 
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(74, 110, 208, 0.2);
+        }
+        
+        .dimensions-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-group {
+            flex: 1;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-input-button {
+            display: block;
+            padding: 10px;
+            background-color: var(--secondary-color);
+            border: 1px dashed var(--border-color);
+            border-radius: var(--radius);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .file-input-button:hover {
+            background-color: #e9ecef;
+            border-color: #aaa;
+        }
+        
+        .file-input-button i {
+            margin-right: 5px;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .filename-display {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #666;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        
+        .preview-area {
+            width: 100%;
+            background-color: #f4f6f8;
+            border-radius: var(--radius);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .frame-container {
+            position: relative;
+            border: 2px solid var(--primary-color);
+            margin: 0 auto;
+            overflow: hidden;
+            background-color: #fff;
+            background-image: 
+                linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+                linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+                linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            user-select: none;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .image-container {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+        }
+
+        .frame-container.circle {
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        
+        .image-to-resize {
+            display: block;
+            pointer-events: none;
+            user-select: none;
+        }
+        
+        .zoom-controls {
+            width: 100%;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .slider-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+        }
+        
+        .slider-container input {
+            flex-grow: 1;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #d7d7d7;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        .slider-value {
+            min-width: 50px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .zoom-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .zoom-button {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--secondary-color);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            transition: all 0.2s;
+        }
+        
+        .zoom-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .no-image {
+            color: #999;
+            font-size: 1rem;
+            text-align: center;
+            padding: 40px 20px;
+            background-color: #fafafa;
+            border-radius: var(--radius);
+            border: 1px dashed #ddd;
+            width: 100%;
+        }
+        
+        .instruction-text {
+            font-size: 0.9rem;
+            color: #666;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        .icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            vertical-align: middle;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #777;
+        }
+        
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transform: translateY(-100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .compact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .unit-selector label {
+            font-weight: normal;
+            font-size: 0.9rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="app-header">
+            <h1>Redimensionador de Imagens</h1>
+            <p class="subtitle">Ajuste, recorte e salve suas imagens facilmente</p>
+        </div>
+
+        <div class="app-grid" id="appGrid">
+            <div class="controls-panel">
+                <div class="control-group">
+                    <div class="section-title">Imagem</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-button">
+                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            Selecionar imagem
+                            <input type="file" id="imageInput" accept="image/*">
+                        </label>
+                    </div>
+                    <div id="filenameDisplay" class="filename-display">Nenhuma imagem selecionada</div>
+                </div>
+
+                <div class="control-group compact-grid">
+                    <div>
+                        <label>Unidade</label>
+                        <div class="unit-selector">
+                            <label><input type="radio" id="pixelUnit" name="unit" value="px"> Pixels</label>
+                            <label><input type="radio" id="cmUnit" name="unit" value="cm" checked> Centímetros</label>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="widthInput">Largura</label>
+                        <input type="number" id="widthInput" min="0.1" step="0.1" value="10.0">
+                    </div>
+                    <div>
+                        <label for="heightInput">Altura</label>
+                        <input type="number" id="heightInput" min="0.1" step="0.1" value="7.0">
+                    </div>
+                    <div style="align-self: flex-end;">
+                        <button id="applyDimensions" class="btn btn-primary" style="width: 100%;">Aplicar</button>
+                    </div>
+                </div>
+                
+                <div class="control-group compact-grid">
+                    <div>
+                        <label for="filenameInput">Nome do arquivo</label>
+                        <input type="text" id="filenameInput" placeholder="Nome do arquivo">
+                    </div>
+                    <div>
+                        <label for="formatSelect">Formato</label>
+                        <select id="formatSelect">
+                            <option value="rect">Retangular</option>
+                            <option value="circle">Circular</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="action-buttons" style="justify-content: flex-start;">
+                    <button id="saveButton" class="btn btn-primary" disabled>Salvar</button>
+                    <button id="copyButton" class="btn btn-secondary" disabled>Copiar</button>
+                </div>
+            </div>
+
+            <div class="preview-panel">
+                <div class="preview-area">
+                    <div id="noImage" class="no-image">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px;">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <p>Aguardando o upload de uma imagem...</p>
+                    </div>
+                    
+                    <div id="frameContainer" class="frame-container" style="display: none;">
+                        <div id="imageContainer" class="image-container">
+                            <img id="imageToResize" class="image-to-resize">
+                        </div>
+                    </div>
+                    
+                    <div id="zoomControls" class="zoom-controls" style="display: none;">
+                        <div class="zoom-buttons">
+                            <button class="zoom-button" id="zoomOutButton">−</button>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" id="zoomSlider" min="10" max="400" value="100">
+                            <span id="zoomValue" class="slider-value">100%</span>
+                        </div>
+                        <div class="zoom-buttons">
+                            <button class="zoom-button" id="zoomInButton">+</button>
+                        </div>
+                    </div>
+                    
+                    <p id="instructions" class="instruction-text" style="display: none;">
+                        Use o scroll do mouse para zoom. Arraste para reposicionar a imagem.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Redimensionador de Imagens © 2025
+        </div>
+    </div>
+    
+    <div id="toast" class="toast">Imagem copiada para a área de transferência!</div>
+
+    <script>
+        // Elementos da página
+        const imageInput = document.getElementById('imageInput');
+        const filenameDisplay = document.getElementById('filenameDisplay');
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+        const pixelUnit = document.getElementById('pixelUnit');
+        const cmUnit = document.getElementById('cmUnit');
+        const applyButton = document.getElementById('applyDimensions');
+        const frameContainer = document.getElementById('frameContainer');
+        const imageContainer = document.getElementById('imageContainer');
+        const imageToResize = document.getElementById('imageToResize');
+        const saveButton = document.getElementById('saveButton');
+        const copyButton = document.getElementById('copyButton');
+        const noImage = document.getElementById('noImage');
+        const instructions = document.getElementById('instructions');
+        const zoomControls = document.getElementById('zoomControls');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomValue = document.getElementById('zoomValue');
+        const zoomInButton = document.getElementById('zoomInButton');
+        const zoomOutButton = document.getElementById('zoomOutButton');
+        const filenameInput = document.getElementById('filenameInput');
+        const toast = document.getElementById('toast');
+
+        // Variáveis globais
+        let originalImage = null;
+        let currentZoom = 100;
+        let isDragging = false;
+        let startX, startY, startLeft, startTop;
+        const DPI = 96; // DPI padrão para conversão de cm para pixels
+
+        // Evento de upload de imagem
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.match('image.*')) {
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    // Carregar e exibir a imagem original
+                    originalImage = new Image();
+                    originalImage.src = event.target.result;
+                    
+                    originalImage.onload = function() {
+                        // Exibir a imagem
+                        imageToResize.src = originalImage.src;
+                        
+                        // Mostrar elementos relevantes
+                        noImage.style.display = 'none';
+                        frameContainer.style.display = 'block';
+                        zoomControls.style.display = 'flex';
+                        instructions.style.display = 'block';
+                        
+                        // Extrair nome do arquivo original para sugestão
+                        const fileName = file.name.split('.')[0];
+                        filenameInput.value = fileName;
+                        filenameDisplay.textContent = file.name;
+                        
+                        // Habilitar botões
+                        saveButton.disabled = false;
+                        copyButton.disabled = false;
+                        
+                        // Aplicar as dimensões iniciais
+                        applyDimensions();
+                    };
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Converter cm para pixels
+        function cmToPx(cm) {
+            return Math.round(cm * DPI / 2.54);
+        }
+
+        // Converter pixels para cm
+        function pxToCm(px) {
+            return (px * 2.54 / DPI).toFixed(1);
+        }
+
+        // Aplicar dimensões ao container fixo
+        applyButton.addEventListener('click', applyDimensions);
+
+        document.getElementById('formatSelect').addEventListener('change', () => {
+            applyDimensions();
+        });
+
+        function applyDimensions() {
+            if (originalImage) {
+                let width, height;
+                
+                // Converter conforme a unidade selecionada
+                if (cmUnit.checked) {
+                    width = cmToPx(parseFloat(widthInput.value) || 10);
+                    height = cmToPx(parseFloat(heightInput.value) || 7);
+                } else {
+                    width = parseInt(widthInput.value) || 300;
+                    height = parseInt(heightInput.value) || 200;
+                }
+                
+                // Definir as dimensões do container fixo
+                frameContainer.style.width = width + 'px';
+                frameContainer.style.height = height + 'px';
+                
+                // Resetar o zoom e a posição da imagem
+                resetImagePosition();
+            }
+
+            const selectedFormat = document.getElementById('formatSelect').value;
+            if (selectedFormat === 'circle') {
+                frameContainer.classList.add('circle');
+            } else {
+                frameContainer.classList.remove('circle');
+            }
+
+        }
+
+        // Resetar a posição da imagem no centro do container
+        function resetImagePosition() {
+            currentZoom = 100;
+            zoomSlider.value = 100;
+            zoomValue.textContent = '100%';
+            
+            updateImageSize();
+            centerImage();
+        }
+
+        // Centralizar a imagem no container
+        function centerImage() {
+            const frameRect = frameContainer.getBoundingClientRect();
+            const imageRect = imageToResize.getBoundingClientRect();
+            
+            const leftPos = (frameRect.width - imageRect.width) / 2;
+            const topPos = (frameRect.height - imageRect.height) / 2;
+            
+            imageContainer.style.left = leftPos + 'px';
+            imageContainer.style.top = topPos + 'px';
+        }
+
+        // Atualizar o tamanho da imagem com base no zoom
+        function updateImageSize() {
+            const scale = currentZoom / 100;
+            const newWidth = originalImage.width * scale;
+            const newHeight = originalImage.height * scale;
+            
+            imageToResize.style.width = newWidth + 'px';
+            imageToResize.style.height = newHeight + 'px';
+        }
+
+        // Evento de mudança do slider de zoom
+        zoomSlider.addEventListener('input', function() {
+            currentZoom = parseInt(this.value);
+            zoomValue.textContent = currentZoom + '%';
+            updateImageSize();
+        });
+
+        // Funções de zoom com botões
+        zoomInButton.addEventListener('click', function() {
+            if (currentZoom < 400) {
+                currentZoom = Math.min(currentZoom + 10, 400);
+                zoomSlider.value = currentZoom;
+                zoomValue.textContent = currentZoom + '%';
+                updateImageSize();
+            }
+        });
+
+        zoomOutButton.addEventListener('click', function() {
+            if (currentZoom > 10) {
+                currentZoom = Math.max(currentZoom - 10, 10);
+                zoomSlider.value = currentZoom;
+                zoomValue.textContent = currentZoom + '%';
+                updateImageSize();
+            }
+        });
+
+        // Zoom com a roda do mouse
+        frameContainer.addEventListener('wheel', function(e) {
+            if (!originalImage) return;
+            
+            e.preventDefault();
+            
+            // Determinar direção do scroll
+            const delta = e.deltaY || e.detail || e.wheelDelta;
+            
+            // Ajustar zoom
+            if (delta > 0) {
+                // Scroll para baixo - diminuir zoom
+                if (currentZoom > 10) {
+                    currentZoom = Math.max(currentZoom - 5, 10);
+                }
+            } else {
+                // Scroll para cima - aumentar zoom
+                if (currentZoom < 400) {
+                    currentZoom = Math.min(currentZoom + 5, 400);
+                }
+            }
+            
+            // Atualizar interface
+            zoomSlider.value = currentZoom;
+            zoomValue.textContent = currentZoom + '%';
+            updateImageSize();
+        });
+
+        // Eventos para arrastar a imagem dentro do container
+        imageContainer.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        
+        // Para dispositivos de toque
+        imageContainer.addEventListener('touchstart', startDrag);
+        document.addEventListener('touchmove', drag);
+        document.addEventListener('touchend', endDrag);
+
+        function startDrag(e) {
+            e.preventDefault(); // Prevenir comportamento padrão de arrastar
+            isDragging = true;
+            
+            // Capturar posição inicial
+            if (e.type === 'touchstart') {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            } else {
+                startX = e.clientX;
+                startY = e.clientY;
+            }
+            
+            // Capturar posição atual do container
+            const computedStyle = window.getComputedStyle(imageContainer);
+            startLeft = parseInt(computedStyle.left) || 0;
+            startTop = parseInt(computedStyle.top) || 0;
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            
+            let clientX, clientY;
+            
+            // Suporte para toque
+            if (e.type === 'touchmove') {
+                e.preventDefault();
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                e.preventDefault(); // Importante para prevenir problemas de arrastar
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            const deltaX = clientX - startX;
+            const deltaY = clientY - startY;
+            
+            imageContainer.style.left = (startLeft + deltaX) + 'px';
+            imageContainer.style.top = (startTop + deltaY) + 'px';
+        }
+
+        function endDrag(e) {
+            if (isDragging) {
+                e.preventDefault(); // Prevenir cliques indesejados
+            }
+            isDragging = false;
+        }
+
+        // Mudar os campos quando alterar a unidade
+        pixelUnit.addEventListener('change', updateUnitFields);
+        cmUnit.addEventListener('change', updateUnitFields);
+
+        function updateUnitFields() {
+            if (cmUnit.checked) {
+                // Converter de pixels para cm
+                if (!isNaN(parseFloat(widthInput.value))) {
+                    widthInput.value = pxToCm(widthInput.value);
+                }
+                if (!isNaN(parseFloat(heightInput.value))) {
+                    heightInput.value = pxToCm(heightInput.value);
+                }
+                widthInput.step = "0.1";
+                heightInput.step = "0.1";
+            } else {
+                // Converter de cm para pixels
+                if (!isNaN(parseFloat(widthInput.value))) {
+                    widthInput.value = Math.round(cmToPx(widthInput.value));
+                }
+                if (!isNaN(parseFloat(heightInput.value))) {
+                    heightInput.value = Math.round(cmToPx(heightInput.value));
+                }
+                widthInput.step = "1";
+                heightInput.step = "1";
+            }
+        }
+
+        // Função para criar canvas com a imagem recortada
+        function createResizedCanvas() {
+            if (!originalImage) return null;
+
+            // Obter dimensões do container
+            let frameWidth, frameHeight;
+            if (cmUnit.checked) {
+                frameWidth = cmToPx(parseFloat(widthInput.value));
+                frameHeight = cmToPx(parseFloat(heightInput.value));
+            } else {
+                frameWidth = parseInt(widthInput.value);
+                frameHeight = parseInt(heightInput.value);
+            }
+
+            // Criar canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = frameWidth;
+            canvas.height = frameHeight;
+            const ctx = canvas.getContext('2d');
+
+            const scale = currentZoom / 100;
+            const offsetX = (parseFloat(imageContainer.style.left) || 0);
+            const offsetY = (parseFloat(imageContainer.style.top) || 0);
+
+            const sx = -offsetX / scale;
+            const sy = -offsetY / scale;
+            const sWidth = frameWidth / scale;
+            const sHeight = frameHeight / scale;
+
+            const safeSX = Math.max(0, sx);
+            const safeSY = Math.max(0, sy);
+            const safeSWidth = Math.min(originalImage.width - safeSX, sWidth);
+            const safeSHeight = Math.min(originalImage.height - safeSY, sHeight);
+
+            // Verificar formato selecionado
+            const selectedFormat = document.getElementById('formatSelect').value;
+
+            if (selectedFormat === 'circle') {
+                // Aplica máscara circular
+                ctx.save();
+                ctx.beginPath();
+                const radius = Math.min(canvas.width, canvas.height) / 2;
+                ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, 2 * Math.PI);
+                ctx.closePath();
+                ctx.clip();
+            }
+
+            // Desenhar imagem recortada
+            ctx.drawImage(
+                originalImage,
+                safeSX, safeSY,
+                safeSWidth, safeSHeight,
+                0, 0,
+                frameWidth, frameHeight
+            );
+
+            if (selectedFormat === 'circle') {
+                ctx.restore();
+            }
+
+            return canvas;
+        }
+
+        // Salvar imagem como arquivo
+        saveButton.addEventListener('click', () => {
+            const canvas = createResizedCanvas();
+            if (!canvas) return;
+
+            const filename = (filenameInput.value || 'imagem') + '.png';
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        // Copiar imagem para a área de transferência
+        copyButton.addEventListener('click', async () => {
+            const canvas = createResizedCanvas();
+            if (!canvas || !navigator.clipboard) return;
+
+            try {
+                canvas.toBlob(async (blob) => {
+                    if (blob) {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        await navigator.clipboard.write([item]);
+                        showToast();
+                    }
+                }, 'image/png');
+            } catch (err) {
+                alert('Erro ao copiar a imagem para a área de transferência.');
+            }
+        });
+
+        // Exibir notificação
+        function showToast() {
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
