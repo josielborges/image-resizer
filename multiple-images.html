@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redimensionador de Múltiplas Imagens</title>
+    <style>
+        :root {
+            --primary-color: #4a6ed0;
+            --primary-hover: #3a5bbd;
+            --secondary-color: #f8f9fa;
+            --border-color: #e0e0e0;
+            --text-color: #333;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fb;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .app-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .app-main-controls {
+            background-color: var(--secondary-color);
+            padding: 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+            display: grid;
+            /* Definir áreas para controle fino do layout */
+            grid-template-areas:
+                "load-title load-title"
+                "load-input load-input"
+                "load-files load-files"
+                "global-title global-title"
+                "global-dims global-dims"
+                "global-file global-file"
+                "global-actions global-actions";
+             grid-template-columns: 1fr 1fr; /* Duas colunas em telas maiores */
+             gap: 20px 30px; /* Espaço vertical e horizontal */
+        }
+
+         /* Layout para telas maiores */
+         @media (min-width: 768px) {
+             .app-main-controls {
+                  grid-template-areas:
+                      "load-title global-title"
+                      "load-input global-dims"
+                      "load-files global-file"
+                      ". global-actions"; /* Salvar todas em baixo */
+                  grid-template-columns: 1fr 2fr; /* Carregar imagens em 1 coluna, Globais em 2 */
+                  gap: 20px 30px;
+             }
+             /* Atribuir áreas aos elementos */
+             .control-group.load-section { grid-area: load-input; }
+             .control-group.global-settings { grid-area: global-dims; } /* Este será o primeiro compact grid */
+             .file-input-wrapper { grid-area: load-input; } /* Pode ser sobreposto pelo control-group.load-section dependendo da estrutura HTML */
+             .filename-display.load-files { grid-area: load-files; }
+             .main-action-buttons { grid-area: global-actions; }
+             .app-main-controls .section-title[data-area="load-title"] { grid-area: load-title; margin-bottom: 0;} /* Ajuste margem */
+             .app-main-controls .section-title[data-area="global-title"] { grid-area: global-title; margin-bottom: 0;} /* Ajuste margem */
+
+             /* Ajustes finos dentro dos grupos globais */
+             .control-group.global-settings > .compact-grid:nth-of-type(1) { grid-area: global-dims; margin-bottom: 0;}
+             .control-group.global-settings > .compact-grid:nth-of-type(2) { grid-area: global-file; margin-bottom: 0;} /* Seleciona o segundo compact-grid (arquivo/formato) */
+
+             /* Remover colunas inteiras que não são usadas nas áreas */
+              .app-main-controls .control-group {
+                  display: flex; /* Usar flexbox para organizar itens dentro do grupo */
+                  flex-direction: column;
+                  gap: 15px; /* Espaço entre itens dentro do grupo */
+              }
+               /* Itens dentro do grupo global */
+              .control-group.global-settings .compact-grid { margin-bottom: 0; } /* Remove margem bottom padrão */
+              .control-group.global-settings .section-title { margin-bottom: 10px; } /* Ajusta margem title */
+         }
+
+
+        .control-group {
+            margin-bottom: 0;
+        }
+
+         .control-group .section-title {
+             margin-bottom: 10px;
+         }
+
+
+        .compact-grid {
+             display: grid;
+             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+             gap: 10px;
+             align-items: end;
+             margin-bottom: 15px;
+         }
+
+        .unit-selector {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .unit-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+            font-size: 0.95rem;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(74, 110, 208, 0.2);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+             grid-column: 1 / -1; /* Ocupa toda a largura por padrão */
+        }
+
+        .file-input-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px dashed var(--border-color);
+            border-radius: var(--radius);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .file-input-button:hover {
+            background-color: #e9ecef;
+            border-color: #aaa;
+            color: var(--primary-color);
+        }
+
+        .file-input-button svg {
+            margin-right: 8px;
+            width: 20px;
+            height: 20px;
+            stroke: #666;
+            transition: stroke 0.2s;
+        }
+
+        .file-input-button:hover svg {
+             stroke: var(--primary-color);
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .filename-display {
+            font-size: 0.85rem;
+            color: #666;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+             margin-bottom: 15px;
+             grid-column: 1 / -1; /* Ocupa toda a largura por padrão */
+        }
+
+         .image-item-header .filename-display {
+              margin-bottom: 0;
+              font-weight: 500;
+              color: #333;
+              flex-grow: 1;
+              margin-right: 10px;
+         }
+
+
+         .main-action-buttons {
+             margin-top: 20px;
+             text-align: center;
+             grid-column: 1 / -1; /* Ocupa toda a largura */
+         }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .image-editor-item {
+            background-color: var(--secondary-color);
+            padding: 15px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 0; /* Adicionado para prevenir overflow em grid/flex */
+        }
+
+        .image-item-header {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             margin-bottom: 10px;
+             gap: 5px;
+             flex-wrap: wrap;
+             flex-shrink: 0; /* Adicionado para evitar que o cabeçalho diminua */
+        }
+         .image-item-header .filename-display {
+              flex-basis: 100%;
+              margin-bottom: 5px;
+         }
+
+
+        .preview-area {
+            width: 100%;
+            background-color: #f4f6f8;
+            border-radius: var(--radius);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 180px;
+            justify-content: center;
+             flex-grow: 1;
+        }
+
+        .frame-container {
+            position: relative;
+            border: 2px solid var(--primary-color);
+            margin: 0 auto;
+            overflow: hidden;
+            background-color: #fff;
+            background-image:
+                linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            user-select: none;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        .image-container {
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+        }
+
+         .image-container.dragging {
+             cursor: grabbing;
+         }
+
+        .frame-container.circle {
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        .image-to-resize {
+            display: block;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .zoom-controls {
+            width: 100%;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .slider-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+        }
+
+        .slider-container input {
+            flex-grow: 1;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #d7d7d7;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .slider-value {
+            min-width: 40px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 0.9rem;
+        }
+
+        .zoom-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .zoom-button {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--secondary-color);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            color: var(--primary-color);
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .zoom-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .no-image {
+            color: #999;
+            font-size: 1rem;
+            text-align: center;
+            padding: 40px 20px;
+            background-color: #fafafa;
+            border-radius: var(--radius);
+            border: 1px dashed #ddd;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .instruction-text {
+            font-size: 0.85rem;
+            color: #666;
+            margin: 5px 0 0 0;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+         .btn-small {
+             padding: 5px 10px;
+             font-size: 0.85rem;
+             gap: 3px;
+         }
+
+         .btn-small .icon {
+             width: 16px;
+             height: 16px;
+         }
+
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            vertical-align: middle;
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #777;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transform: translateY(-100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+         .toast.success { background-color: #4CAF50; } /* Green */
+         .toast.error { background-color: #f44336; } /* Red */
+         .toast.warning { background-color: #ff9800; } /* Orange */
+         .toast.info { background-color: #2196F3; } /* Blue */
+
+
+        @media (max-width: 767px) {
+            .container {
+                padding: 15px;
+            }
+
+            .app-main-controls {
+                 padding: 15px;
+                 grid-template-columns: 1fr; /* Pilha em telas menores */
+                 gap: 15px;
+                  grid-template-areas:
+                      "load-title"
+                      "load-input"
+                      "load-files"
+                      "global-title"
+                      "global-dims"
+                      "global-file"
+                      "global-actions";
+            }
+
+             /* Reset áreas específicas para mobile */
+             .control-group.load-section { grid-area: unset; }
+             .control-group.global-settings { grid-area: unset; }
+             .file-input-wrapper { grid-area: unset; }
+             .filename-display.load-files { grid-area: unset; }
+              .app-main-controls .section-title[data-area] { grid-area: unset; margin-bottom: 10px !important;} /* Garante margem em mobile */
+
+
+             .compact-grid {
+                 grid-template-columns: 1fr;
+                 margin-bottom: 10px;
+             }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .btn {
+                padding: 8px 12px;
+                font-size: 0.9rem;
+            }
+
+             .btn-small {
+                 padding: 4px 8px;
+                 font-size: 0.75rem;
+             }
+              .btn-small .icon {
+                  width: 14px;
+                  height: 14px;
+              }
+
+
+             .image-grid {
+                 gap: 20px;
+             }
+
+             .image-editor-item {
+                 padding: 10px;
+             }
+
+             .preview-area {
+                 min-height: 150px;
+             }
+
+             .zoom-controls {
+                 margin: 5px 0;
+             }
+
+              .image-item-header {
+                  flex-direction: column;
+                  align-items: flex-start;
+              }
+              .image-item-header .filename-display {
+                  margin-right: 0;
+              }
+              .image-item-header .btn-small {
+                  width: 100%;
+                   margin-bottom: 5px;
+              }
+               .image-item-header .btn-small:last-child {
+                   margin-bottom: 0;
+               }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="app-header">
+            <h1>Redimensionador de Múltiplas Imagens</h1>
+            <p class="subtitle">Ajuste globalmente as dimensões, posicione e dê zoom individualmente</p>
+        </div>
+
+        <div class="app-main-controls">
+            <div class="control-group load-section">
+                <div class="section-title" data-area="load-title">Carregar Imagens</div>
+                <div class="file-input-wrapper" data-area="load-input">
+                    <label class="file-input-button">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        Selecionar imagens
+                        <input type="file" id="imageInput" accept="image/*" multiple>
+                    </label>
+                </div>
+                 <div id="selectedFileNames" class="filename-display load-files" data-area="load-files">Nenhuma imagem selecionada</div>
+            </div>
+
+             <div class="control-group global-settings"> <div class="section-title" data-area="global-title">Configurações Globais</div>
+                 <div class="compact-grid" data-area="global-dims">
+                     <div>
+                         <label>Unidade</label>
+                         <div class="unit-selector">
+                             <label><input type="radio" name="globalUnit" value="px"> Pixels</label>
+                             <label><input type="radio" name="globalUnit" value="cm" checked> Centímetros</label>
+                         </div>
+                     </div>
+                     <div class="input-group">
+                         <label for="globalWidthInput">Largura</label>
+                         <input type="number" id="globalWidthInput" min="0.1" step="0.1" value="10.0">
+                     </div>
+                     <div class="input-group">
+                         <label for="globalHeightInput">Altura</label>
+                         <input type="number" id="globalHeightInput" min="0.1" step="0.1" value="7.0">
+                     </div>
+                      <div style="align-self: flex-end;">
+                          <button id="applyGlobalDimensions" class="btn btn-primary" style="width: 100%;">Aplicar Dimensões</button>
+                      </div>
+                  </div>
+
+                 <div class="compact-grid" data-area="global-file">
+                     <div class="input-group">
+                         <label for="globalFilenamePrefix">Prefixo do arquivo</label>
+                         <input type="text" id="globalFilenamePrefix" placeholder="Ex: imagem">
+                     </div>
+                      <div class="input-group">
+                          <label for="globalFormatSelect">Formato</label>
+                          <select id="globalFormatSelect">
+                              <option value="rect">Retangular</option>
+                              <option value="circle">Circular</option>
+                          </select>
+                      </div>
+                 </div>
+
+            </div>
+
+
+             <div id="globalActions" class="main-action-buttons" data-area="global-actions" style="display: none;">
+                 <button id="saveAllButton" class="btn btn-primary">
+                      <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                     Salvar Todas (.zip)
+                 </button>
+             </div>
+        </div>
+
+
+        <div id="imageGrid" class="image-grid">
+            <div id="noImagesLoaded" class="no-image" style="display: flex; grid-column: 1 / -1;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <p>Carregue imagens usando o botão acima para começar.</p>
+             </div>
+            </div>
+
+        <div class="footer">
+            Redimensionador de Múltiplas Imagens © 2025
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+
+    <script>
+        // Elementos da página
+        const imageInput = document.getElementById('imageInput');
+        const selectedFileNames = document.getElementById('selectedFileNames');
+        const imageGrid = document.getElementById('imageGrid');
+        const noImagesLoaded = document.getElementById('noImagesLoaded');
+        const globalActions = document.getElementById('globalActions');
+        const saveAllButton = document.getElementById('saveAllButton');
+
+        // Controles Globais
+        const globalWidthInput = document.getElementById('globalWidthInput');
+        const globalHeightInput = document.getElementById('globalHeightInput');
+        const globalPixelUnit = document.querySelector('input[name="globalUnit"][value="px"]');
+        const globalCmUnit = document.querySelector('input[name="globalUnit"][value="cm"]');
+        const applyGlobalDimensionsButton = document.getElementById('applyGlobalDimensions');
+        const globalFilenamePrefixInput = document.getElementById('globalFilenamePrefix');
+        const globalFormatSelect = document.getElementById('globalFormatSelect');
+
+
+        const toast = document.getElementById('toast');
+
+        // Array para armazenar dados e elementos de cada imagem
+        let imagesData = [];
+
+        // Estado Global (dimensões, unidade, formato, prefixo)
+        let globalWidth = parseFloat(globalWidthInput.value) || 10;
+        let globalHeight = parseFloat(globalHeightInput.value) || 7;
+        let globalUnit = globalCmUnit.checked ? 'cm' : 'px';
+        let globalFormat = globalFormatSelect.value || 'rect';
+        const DPI = 96; // DPI padrão para conversão de cm para pixels
+
+        // Converter cm para pixels
+        function cmToPx(cm) {
+            return Math.round(cm * DPI / 2.54);
+        }
+
+        // Converter pixels para cm
+        function pxToCm(px) {
+            return (px * 2.54 / DPI).toFixed(1);
+        }
+
+        // Converter valor de input de unidade para pixels
+         function convertInputValueToPx(value, unit) {
+             const floatValue = parseFloat(value);
+             if (isNaN(floatValue) || floatValue <= 0) return 0;
+             return unit === 'cm' ? cmToPx(floatValue) : floatValue;
+         }
+
+
+        // Criar um novo item de editor de imagem no DOM (inclui controles de zoom individuais agora)
+        function createImageEditorItem(file, id) {
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const originalImage = new Image();
+                originalImage.src = event.target.result;
+
+                originalImage.onload = function() {
+                     // Usamos as dimensões globais para o frame inicial
+                     const initialFrameWidthPx = convertInputValueToPx(globalWidthInput.value, globalUnit);
+                     const initialFrameHeightPx = convertInputValueToPx(globalHeightInput.value, globalUnit);
+
+                    const itemHTML = `
+                        <div class="image-editor-item" data-id="${id}">
+                             <div class="image-item-header">
+                                 <div class="filename-display">${file.name}</div>
+                                 <button class="btn btn-primary btn-small save-button" data-id="${id}">
+                                      <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                      Salvar
+                                 </button>
+                                 <button class="btn btn-secondary btn-small copy-button" data-id="${id}">
+                                      <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                     Copiar
+                                 </button>
+                             </div>
+                            <div class="preview-area">
+                                <div class="frame-container" id="frameContainer_${id}" style="width:${initialFrameWidthPx}px; height:${initialFrameHeightPx}px;" data-id="${id}">
+                                    <div class="image-container" id="imageContainer_${id}" data-id="${id}">
+                                        <img class="image-to-resize" id="imageToResize_${id}" src="${originalImage.src}">
+                                    </div>
+                                </div>
+
+                                <div class="zoom-controls" data-id="${id}">
+                                    <div class="zoom-buttons">
+                                        <button class="zoom-button zoom-out-button" data-id="${id}">−</button>
+                                    </div>
+                                    <div class="slider-container">
+                                        <input type="range" class="zoom-slider" id="zoomSlider_${id}" min="10" max="400" value="100" data-id="${id}">
+                                        <span class="slider-value" id="zoomValue_${id}">100%</span>
+                                    </div>
+                                    <div class="zoom-buttons">
+                                        <button class="zoom-button zoom-in-button" data-id="${id}">+</button>
+                                    </div>
+                                </div>
+                                <p class="instruction-text">
+                                     Use o scroll do mouse (sobre a imagem) para zoom. Arraste para reposicionar.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+
+                    imageGrid.insertAdjacentHTML('beforeend', itemHTML);
+
+                    // Armazenar dados da imagem e referências dos elementos
+                    const item = {
+                        id: id,
+                        file: file,
+                        originalImage: originalImage,
+                        currentZoom: 100, // Zoom individual
+                        // Posição inicial (centrada)
+                        currentLeft: 0,
+                        currentTop: 0,
+                        frameContainer: document.getElementById(`frameContainer_${id}`),
+                        imageContainer: document.getElementById(`imageContainer_${id}`),
+                        imageToResize: document.getElementById(`imageToResize_${id}`),
+                        zoomSlider: document.getElementById(`zoomSlider_${id}`),
+                        zoomValueSpan: document.getElementById(`zoomValue_${id}`),
+                        zoomInButton: document.querySelector(`.zoom-in-button[data-id="${id}"]`),
+                        zoomOutButton: document.querySelector(`.zoom-out-button[data-id="${id}"]`),
+                        saveButton: document.querySelector(`.save-button[data-id="${id}"]`),
+                        copyButton: document.querySelector(`.copy-button[data-id="${id}"]`),
+                         // Estado de arrasto individual
+                         isDragging: false,
+                         startX: 0,
+                         startY: 0,
+                         startLeft: 0,
+                         startTop: 0,
+                    };
+                    imagesData.push(item);
+
+                    // Adicionar listeners de eventos individuais (arrastar, salvar, copiar, zoom)
+                    addEventListenersToItem(id);
+
+                    // Aplicar as configurações globais iniciais a esta nova imagem
+                     applyGlobalSettingsToItem(id);
+
+                    // Exibir o botão "Salvar Todas"
+                     globalActions.style.display = 'block';
+                     noImagesLoaded.style.display = 'none';
+                };
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        // Adicionar listeners de eventos individuais para um item específico
+        function addEventListenersToItem(id) {
+            const item = imagesData.find(item => item.id === id);
+            if (!item) return;
+
+            // Arrastar imagem
+            item.imageContainer.addEventListener('mousedown', (e) => startDrag(e, id));
+            // Drag e EndDrag são globais para permitir arrastar para fora do container
+            // document.addEventListener('mousemove', (e) => drag(e, id)); // Listener global
+            // document.addEventListener('mouseup', (e) => endDrag(e, id)); // Listener global
+
+            // Para dispositivos de toque
+            item.imageContainer.addEventListener('touchstart', (e) => startDrag(e, id));
+            // document.addEventListener('touchmove', (e) => drag(e, id)); // Listener global
+            // document.addEventListener('touchend', (e) => endDrag(e, id)); // Listener global
+
+            // Salvar individual
+            item.saveButton.addEventListener('click', () => saveImage(id));
+
+            // Copiar individual
+            item.copyButton.addEventListener('click', () => copyImage(id));
+
+            // Zoom com roda do mouse (individual)
+             item.frameContainer.addEventListener('wheel', (e) => {
+                  if (!item.originalImage) return;
+                  e.preventDefault();
+
+                  // Ajustar zoom individual
+                  const delta = e.deltaY || e.detail || e.wheelDelta;
+                  const oldZoom = item.currentZoom;
+                  if (delta > 0) { // Scroll para baixo - diminuir zoom
+                       if (item.currentZoom > 10) item.currentZoom = Math.max(item.currentZoom - 5, 10);
+                  } else { // Scroll para cima - aumentar zoom
+                       if (item.currentZoom < 400) item.currentZoom = Math.min(item.currentZoom + 5, 400);
+                  }
+
+                  // Atualizar slider individual e valor
+                  item.zoomSlider.value = item.currentZoom;
+                  item.zoomValueSpan.textContent = item.currentZoom + '%';
+
+                  // Aplicar novo zoom e tentar manter a posição relativa
+                   updateImageSizeAndPosition(id, oldZoom); // Passa o zoom anterior
+             });
+
+             // Zoom Slider (individual)
+             item.zoomSlider.addEventListener('input', () => {
+                 const oldZoom = item.currentZoom; // Captura zoom anterior
+                 item.currentZoom = parseInt(item.zoomSlider.value);
+                 item.zoomValueSpan.textContent = item.currentZoom + '%';
+                 updateImageSizeAndPosition(id, oldZoom); // Passa o zoom anterior
+             });
+
+             // Zoom Botões (individuais)
+             item.zoomInButton.addEventListener('click', () => {
+                  const oldZoom = item.currentZoom;
+                  if (item.currentZoom < 400) {
+                      item.currentZoom = Math.min(item.currentZoom + 10, 400);
+                      item.zoomSlider.value = item.currentZoom;
+                      item.zoomValueSpan.textContent = item.currentZoom + '%';
+                      updateImageSizeAndPosition(id, oldZoom);
+                  }
+             });
+
+             item.zoomOutButton.addEventListener('click', () => {
+                  const oldZoom = item.currentZoom;
+                  if (item.currentZoom > 10) {
+                      item.currentZoom = Math.max(item.currentZoom - 10, 10);
+                      item.zoomSlider.value = item.currentZoom;
+                      item.zoomValueSpan.textContent = item.currentZoom + '%';
+                      updateImageSizeAndPosition(id, oldZoom);
+                  }
+             });
+
+        }
+
+         // --- Funções Globais (aplicam a todos) ---
+
+         // Aplicar dimensões e formato globais a um item específico
+         function applyGlobalSettingsToItem(id) {
+             const item = imagesData.find(item => item.id === id);
+             if (!item || !item.originalImage) return;
+
+             // Captura as dimensões atuais antes de mudar o frame
+             const oldFrameWidthPx = item.frameContainer.offsetWidth;
+             const oldFrameHeightPx = item.frameContainer.offsetHeight;
+
+             // Aplicar dimensões do frame
+             const frameWidthPx = convertInputValueToPx(globalWidth, globalUnit);
+             const frameHeightPx = convertInputValueToPx(globalHeight, globalUnit);
+
+             item.frameContainer.style.width = frameWidthPx + 'px';
+             item.frameContainer.style.height = frameHeightPx + 'px';
+
+             // Aplicar formato
+             if (globalFormat === 'circle') {
+                 item.frameContainer.classList.add('circle');
+             } else {
+                 item.frameContainer.classList.remove('circle');
+             }
+
+             // Reajustar tamanho e posição da imagem mantendo a posição relativa ao centro
+              // Passamos as dimensões antigas do frame para o cálculo de posicionamento
+             updateImageSizeAndPosition(id, item.currentZoom, oldFrameWidthPx, oldFrameHeightPx);
+         }
+
+         // Aplicar configurações globais de dimensão/formato a TODAS as imagens
+         function applyGlobalDimensionsAndFormat() {
+             // Atualizar variáveis globais dos inputs
+             globalWidth = parseFloat(globalWidthInput.value) || (globalUnit === 'cm' ? 10 : 300);
+             globalHeight = parseFloat(globalHeightInput.value) || (globalUnit === 'cm' ? 7 : 200);
+             globalUnit = globalPixelUnit.checked ? 'px' : 'cm';
+             globalFormat = globalFormatSelect.value || 'rect';
+
+             if (imagesData.length === 0) {
+                  showToast('Carregue imagens primeiro.', 'info');
+                  return;
+             }
+
+             imagesData.forEach(item => {
+                 applyGlobalSettingsToItem(item.id);
+             });
+              showToast('Configurações de dimensão e formato aplicadas.', 'success');
+         }
+
+
+         // Atualizar tamanho e posição da imagem dentro do frame para um item específico
+         // Agora mantém a posição relativa ao centro ao mudar zoom ou frame size
+         function updateImageSizeAndPosition(id, oldZoom, oldFrameWidthPx, oldFrameHeightPx) {
+              const item = imagesData.find(item => item.id === id);
+              if (!item || !item.originalImage) return;
+
+              const currentFrameWidthPx = item.frameContainer.offsetWidth;
+              const currentFrameHeightPx = item.frameContainer.offsetHeight;
+
+              // Usar as dimensões do frame antigas se fornecidas (ao aplicar dimensões globais)
+              const prevFrameWidth = oldFrameWidthPx !== undefined ? oldFrameWidthPx : currentFrameWidthPx;
+              const prevFrameHeight = oldFrameHeightPx !== undefined ? oldFrameHeightPx : currentFrameHeightPx;
+
+              // Calcular a posição do centro da imagem atual (antes do redimensionamento)
+              const prevImageWidth = item.originalImage.width * (oldZoom / 100);
+              const prevImageHeight = item.originalImage.height * (oldZoom / 100);
+              const prevImageCenterX = item.currentLeft + prevImageWidth / 2;
+              const prevImageCenterY = item.currentTop + prevImageHeight / 2;
+
+              // Calcular a posição do centro do frame anterior
+              const prevFrameCenterX = prevFrameWidth / 2;
+              const prevFrameCenterY = prevFrameHeight / 2;
+
+              // Calcular o deslocamento do centro da imagem em relação ao centro do frame anterior
+              const offsetXFromFrameCenter = prevImageCenterX - prevFrameCenterX;
+              const offsetYFromFrameCenter = prevImageCenterY - prevFrameCenterY;
+
+
+              // Calcular o novo tamanho da imagem com o zoom atual (individual)
+              const newImageWidth = item.originalImage.width * (item.currentZoom / 100);
+              const newImageHeight = item.originalImage.height * (item.currentZoom / 100);
+
+
+              // Calcular a posição do centro do frame atual
+              const currentFrameCenterX = currentFrameWidthPx / 2;
+              const currentFrameCenterY = currentFrameHeightPx / 2;
+
+              // Calcular a nova posição desejada para o centro da imagem para manter o deslocamento relativo ao centro do frame atual
+              const newDesiredImageCenterX = currentFrameCenterX + offsetXFromFrameCenter;
+              const newDesiredImageCenterY = currentFrameCenterY + offsetYFromFrameCenter;
+
+              // Calcular a nova posição top-left da imagem
+              const newLeft = newDesiredImageCenterX - newImageWidth / 2;
+              const newTop = newDesiredImageCenterY - newImageHeight / 2;
+
+
+              // Aplicar o novo tamanho e posição
+              item.imageToResize.style.width = newImageWidth + 'px';
+              item.imageToResize.style.height = newImageHeight + 'px';
+
+              item.imageContainer.style.left = newLeft + 'px';
+              item.imageContainer.style.top = newTop + 'px';
+
+              // Salvar a nova posição no objeto item
+              item.currentLeft = newLeft;
+              item.currentTop = newTop;
+         }
+
+
+        // --- Funções Individuais (Arrastar) ---
+
+        function startDrag(e, id) {
+            const item = imagesData.find(item => item.id === id);
+            if (!item || !item.originalImage) return;
+
+            e.preventDefault();
+            item.isDragging = true;
+            item.imageContainer.classList.add('dragging');
+
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+            item.startX = clientX;
+            item.startY = clientY;
+
+            // Capturar posição inicial do elemento DOM para o início do arrasto
+            const computedStyle = window.getComputedStyle(item.imageContainer);
+            item.startLeft = parseInt(computedStyle.left) || 0;
+            item.startTop = parseInt(computedStyle.top) || 0;
+        }
+
+        // Função drag é global, mas opera no item que está sendo arrastado
+        function drag(e) {
+             const activeItem = imagesData.find(item => item.isDragging);
+             if (!activeItem) return;
+
+            let clientX, clientY;
+
+            if (e.type === 'touchmove') {
+                e.preventDefault();
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                e.preventDefault();
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const deltaX = clientX - activeItem.startX;
+            // CORREÇÃO: Removido 'activeY' que estava incorreto
+            const deltaY = clientY - activeItem.startY;
+
+            // Calcular e aplicar a nova posição
+            const newLeft = activeItem.startLeft + deltaX;
+            const newTop = activeItem.startTop + deltaY;
+
+            activeItem.imageContainer.style.left = newLeft + 'px';
+            activeItem.imageContainer.style.top = newTop + 'px';
+
+             // Atualizar a posição salva no objeto item
+             activeItem.currentLeft = newLeft;
+             activeItem.currentTop = newTop;
+        }
+
+         // Função endDrag é global, mas opera no item que estava sendo arrastado
+        function endDrag(e) {
+             const activeItem = imagesData.find(item => item.isDragging);
+             if (!activeItem) return;
+
+             if (e.type !== 'touchmove') {
+                  // Pode adicionar um pequeno delay ou verificar distância para prevenir cliques
+             }
+             activeItem.isDragging = false;
+             activeItem.imageContainer.classList.remove('dragging');
+        }
+
+        // Listeners globais para arrastar (no documento)
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchmove', drag);
+        document.addEventListener('touchend', endDrag);
+
+
+        // --- Funções de Geração de Canvas (usam estado Global e Individual) ---
+
+        // Função para criar canvas com a imagem recortada para um item específico
+        function createResizedCanvas(id) {
+            const item = imagesData.find(item => item.id === id);
+            if (!item || !item.originalImage) return null;
+
+            // Obter dimensões globais do frame (já convertidas para pixels)
+            const frameWidth = item.frameContainer.offsetWidth; // Pegar dimensão atual do DOM
+            const frameHeight = item.frameContainer.offsetHeight; // Pegar dimensão atual do DOM
+
+             if (isNaN(frameWidth) || isNaN(frameHeight) || frameWidth <= 0 || frameHeight <= 0) {
+                 console.error(`Dimensões inválidas do frame para o item ${item.file.name}: ${frameWidth}x${frameHeight}`);
+                 showToast('Erro: Dimensões do frame inválidas para uma imagem.', 'error');
+                 return null;
+             }
+
+            // Criar canvas com as dimensões do frame
+            const canvas = document.createElement('canvas');
+            canvas.width = frameWidth;
+            canvas.height = frameHeight;
+            const ctx = canvas.getContext('2d');
+
+            // Obter posição atual da imagem dentro do frame (individual)
+            const offsetX = item.currentLeft; // Usar posição salva durante o drag
+            const offsetY = item.currentTop; // Usar posição salva durante o drag
+
+            // Obter tamanho atual da imagem (resultado do zoom INDIVIDUAL)
+             const imageWidth = item.imageToResize.offsetWidth;
+             const imageHeight = item.imageToResize.offsetHeight;
+
+
+            // Calcular parâmetros de desenho baseados na posição atual da imagem redimensionada
+             // srcX, srcY, srcWidth, srcHeight (na imagem original)
+             // destX, destY, destWidth, destHeight (no canvas)
+
+             const scale = imageWidth / item.originalImage.width; // Escala atual baseada no tamanho redimensionado
+
+             const srcX = -offsetX / scale;
+             const srcY = -offsetY / scale;
+             const srcWidth = frameWidth / scale;
+             const srcHeight = frameHeight / scale;
+
+             // Ajustar src para não ler fora da imagem original
+             const safeSrcX = Math.max(0, srcX);
+             const safeSrcY = Math.max(0, srcY);
+             const safeSrcWidth = Math.min(item.originalImage.width - safeSrcX, srcWidth - (safeSrcX - srcX));
+             const safeSrcHeight = Math.min(item.originalImage.height - safeSrcY, srcHeight - (safeSrcY - srcY));
+
+             // Ajustar dest para compensar o ajuste de src
+             const destX = (safeSrcX - srcX) * scale;
+             const destY = (safeSrcY - srcY) * scale;
+             const destWidth = safeSrcWidth * scale;
+             const destHeight = safeSrcHeight * scale;
+
+
+            // Aplicar formato global (circular ou retangular)
+            if (globalFormat === 'circle') {
+                ctx.save();
+                ctx.beginPath();
+                const radius = Math.min(canvas.width, canvas.height) / 2;
+                ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, 2 * Math.PI);
+                ctx.closePath();
+                ctx.clip();
+                 /* Não desenhar fundo branco aqui se a imagem já preenche o círculo.
+                    Se a imagem não preenche, o fundo transparente pode ser desejado,
+                    ou talvez precise de lógica para preencher o fundo APENAS onde
+                    a imagem não cobre. Por enquanto, vamos remover o fundo branco
+                    para manter a transparência padrão do canvas onde a imagem não está.
+                 */
+            } else {
+                 /* Mesmo para retangular, se a imagem não preenche o frame,
+                    o fundo do canvas será transparente por padrão.
+                    Removido o fillRect para não forçar fundo branco.
+                 */
+            }
+
+             // Usando os cálculos ajustados (safeSrc)
+            ctx.drawImage(
+                item.originalImage,
+                safeSrcX, safeSrcY,
+                safeSrcWidth, safeSrcHeight,
+                destX, destY,
+                destWidth, destHeight
+            );
+
+
+            if (globalFormat === 'circle') {
+                ctx.restore(); // Restaura o estado do contexto (remove a máscara)
+            }
+
+
+            return canvas;
+        }
+
+        // Salvar imagem individual como arquivo
+        function saveImage(id) {
+            const item = imagesData.find(item => item.id === id);
+            if (!item) return;
+
+            const canvas = createResizedCanvas(id);
+            if (!canvas) return;
+
+            const baseFilename = globalFilenamePrefixInput.value || 'imagem';
+            // Gerar um nome de arquivo mais amigável, por exemplo: prefixo_nomeoriginal_IDcurto.png
+            const originalName = item.file.name.split('.')[0].replace(/[^a-zA-Z0-9_-]/g, '_'); // Limpa caracteres inválidos
+            const shortId = item.id.split('_').pop(); // Pega a última parte do ID
+            const filename = `${baseFilename}_${originalName}_${shortId}.png`;
+
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showToast(`Imagem "${filename}" salva.`, 'success');
+        }
+
+        // Copiar imagem individual para a área de transferência
+        async function copyImage(id) {
+             const item = imagesData.find(item => item.id === id);
+             if (!item) return;
+
+             const canvas = createResizedCanvas(id);
+             if (!canvas || !navigator.clipboard) {
+                 showToast('Erro: Não foi possível copiar. O navegador não suporta a API de Clipboard.', 'error');
+                 return;
+             }
+
+             try {
+                 canvas.toBlob(async (blob) => {
+                     if (blob) {
+                         if (typeof ClipboardItem !== 'undefined') {
+                             const clipboardItem = new ClipboardItem({ 'image/png': blob });
+                             await navigator.clipboard.write([clipboardItem]);
+                             showToast('Imagem copiada para a área de transferência!', 'success');
+                         } else {
+                             showToast('Erro: Seu navegador não suporta a cópia direta de imagens.', 'error');
+                         }
+                     } else {
+                         showToast('Erro ao gerar a imagem para copiar.', 'error');
+                     }
+                 }, 'image/png');
+             } catch (err) {
+                 console.error('Erro ao copiar imagem:', err);
+                 showToast('Erro ao copiar a imagem para a área de transferência.', 'error');
+             }
+        }
+
+
+        // Salvar todas as imagens como ZIP
+        saveAllButton.addEventListener('click', async () => {
+            if (imagesData.length === 0) {
+                showToast('Nenhuma imagem para salvar.', 'info');
+                return;
+            }
+
+            const zip = new JSZip();
+            let hasError = false;
+            const baseFilename = globalFilenamePrefixInput.value || 'imagens'; // Nome padrão para o ZIP
+
+             // Desabilitar o botão enquanto processa
+             saveAllButton.disabled = true;
+             saveAllButton.textContent = 'Gerando ZIP...';
+
+            for (const item of imagesData) {
+                 try {
+                     const canvas = createResizedCanvas(item.id);
+                     if (!canvas) {
+                         console.error(`Falha ao criar canvas para a imagem ${item.file.name}.`);
+                         hasError = true;
+                         continue;
+                     }
+
+                     const originalName = item.file.name.split('.')[0].replace(/[^a-zA-Z0-9_-]/g, '_');
+                     const shortId = item.id.split('_').pop();
+                     // Nome do arquivo dentro do ZIP: prefixoGlobal_nomeOriginalArquivo_idCurto.png
+                     const filename = `${baseFilename}_${originalName}_${shortId}.png`;
+
+
+                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                     if (blob) {
+                          zip.file(filename, blob);
+                     } else {
+                         console.error(`Falha ao gerar Blob para a imagem ${item.file.name}.`);
+                          hasError = true;
+                     }
+                 } catch (err) {
+                      console.error(`Erro ao processar imagem ${item.file.name} para ZIP:`, err);
+                       hasError = true;
+                 }
+            }
+
+            if (hasError) {
+                 showToast('Algumas imagens não puderam ser processadas e não foram incluídas no ZIP.', 'warning');
+            }
+
+
+             // Gerar o arquivo ZIP
+             zip.generateAsync({ type: "blob" })
+             .then(function(content) {
+                 saveAs(content, `${baseFilename}.zip`); // Nome do arquivo ZIP
+                 showToast('Todas as imagens salvas como ZIP.', 'success');
+             })
+             .catch(err => {
+                 console.error('Erro ao gerar o arquivo ZIP:', err);
+                 showToast('Erro ao gerar o arquivo ZIP.', 'error');
+             })
+             .finally(() => {
+                  // Reabilitar o botão
+                  saveAllButton.disabled = false;
+                  saveAllButton.textContent = 'Salvar Todas (.zip)';
+             });
+        });
+
+
+        // Evento de upload de múltiplas imagens
+        imageInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length === 0) {
+                selectedFileNames.textContent = 'Nenhuma imagem selecionada';
+                globalActions.style.display = 'none';
+                 imageGrid.innerHTML = ''; // Limpa a grid
+                 imagesData = []; // Limpa os dados
+                 noImagesLoaded.style.display = 'flex'; // Mostra mensagem de sem imagem
+                return;
+            }
+
+            // Limpar imagens anteriores
+            imageGrid.innerHTML = '';
+            imagesData = [];
+            noImagesLoaded.style.display = 'none'; // Esconde mensagem de sem imagem
+
+            let names = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.type.match('image.*')) {
+                    const id = `img_${Date.now()}_${i}`; // ID mais robusto
+                    createImageEditorItem(file, id);
+                    names.push(file.name);
+                } else {
+                     console.warn(`Arquivo "${file.name}" não é uma imagem e será ignorado.`);
+                     showToast(`Aviso: Arquivo "${file.name}" ignorado (não é imagem).`, 'warning');
+                }
+            }
+
+             selectedFileNames.textContent = `Selecionadas: ${names.join(', ')}`;
+
+             // Aplicar configurações globais de dimensão/formato iniciais após carregar as imagens
+             applyGlobalDimensionsAndFormat();
+        });
+
+
+         // --- Listeners para Controles Globais ---
+
+         // Aplicar dimensões e formato ao clicar no botão
+         applyGlobalDimensionsButton.addEventListener('click', applyGlobalDimensionsAndFormat);
+
+         /*
+         // Manter step dos inputs de dimensão atualizado ao mudar a unidade (opcional)
+         globalPixelUnit.addEventListener('change', () => {
+              globalWidthInput.step = "1";
+              globalHeightInput.step = "1";
+         });
+         globalCmUnit.addEventListener('change', () => {
+              globalWidthInput.step = "0.1";
+              globalHeightInput.step = "0.1";
+         });
+         */
+
+         // Aplicar formato instantaneamente ao mudar a seleção
+         globalFormatSelect.addEventListener('change', () => {
+             globalFormat = globalFormatSelect.value;
+             imagesData.forEach(item => {
+                  if (globalFormat === 'circle') {
+                      item.frameContainer.classList.add('circle');
+                  } else {
+                      item.frameContainer.classList.remove('circle');
+                  }
+             });
+             showToast('Formato aplicado a todas as imagens.', 'success');
+         });
+
+         // Controles de zoom globais removidos
+
+
+        // Função para exibir o Toast
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = 'toast show'; // Reset classes and show
+             // Remova classes de tipo anteriores
+             toast.classList.remove('success', 'error', 'warning', 'info');
+             // Adiciona a nova classe de tipo para definir a cor
+             toast.classList.add(type);
+
+             // Define a cor de fundo diretamente (alternativa às classes)
+             if (type === 'error') {
+                 toast.style.backgroundColor = '#f44336'; /* Red */
+             } else if (type === 'warning') {
+                 toast.style.backgroundColor = '#ff9800'; /* Orange */
+             } else if (type === 'info') {
+                 toast.style.backgroundColor = '#2196F3'; /* Blue */
+             } else {
+                 toast.style.backgroundColor = '#4CAF50'; /* Green (success) */
+             }
+
+
+            // Limpa timeout anterior para não sobrepor toasts
+            if (toast.timeoutId) {
+                 clearTimeout(toast.timeoutId);
+            }
+
+            toast.timeoutId = setTimeout(() => {
+                toast.className = 'toast'; // Hide after 3 seconds
+                 toast.timeoutId = null;
+            }, 3000);
+        }
+
+         // Inicialização (oculta o botão Salvar Todas e mostra mensagem inicial)
+         globalActions.style.display = 'none';
+         noImagesLoaded.style.display = 'flex';
+
+
+    </script>
+</body>
+</html>
