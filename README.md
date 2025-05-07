@@ -32,8 +32,8 @@ This tool allows you to select single/multiple images simultaneously and adjust 
 
 Both libraries are loaded via CDN (Content Delivery Network) directly within the HTML file.
 
-## Links
+## Tools links
 
-Single image resizer https://josielborges.github.io/image-resizer/single-image.html
+[Single image resizer](https://josielborges.github.io/image-resizer/single-image.html)
 
-Multiple image resizer https://josielborges.github.io/image-resizer/multiple-images.html
+[Multiple image resizer](https://josielborges.github.io/image-resizer/multiple-images.html)
